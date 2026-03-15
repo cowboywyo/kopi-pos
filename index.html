@@ -730,6 +730,186 @@
     border: none;
   }
   .table-badge:active { transform: scale(0.95); }
+
+  /* ─── MODE TOGGLE ON TABLE SCREEN ─── */
+  .mode-toggle {
+    display: flex; gap: 0; margin-bottom: 28px;
+    background: rgba(0,0,0,0.3); border-radius: 25px; padding: 3px;
+  }
+  .mode-toggle-btn {
+    border: none; background: transparent;
+    color: rgba(255,248,225,0.5);
+    font-family: 'Fredoka', sans-serif;
+    font-size: 14px; font-weight: 600;
+    padding: 10px 24px; border-radius: 22px;
+    cursor: pointer; transition: all 0.2s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .mode-toggle-btn.active {
+    background: var(--accent-orange); color: white;
+    box-shadow: 0 2px 8px rgba(255,143,0,0.4);
+  }
+  .mode-toggle-btn:not(.active):hover { color: var(--cream); }
+
+  /* ─── KITCHEN DISPLAY VIEW ─── */
+  .kitchen-view {
+    position: fixed; inset: 0; z-index: 100;
+    display: flex; flex-direction: column;
+    background: #1a1a2e;
+    display: none;
+  }
+  .kitchen-view.active { display: flex; }
+
+  .kitchen-header {
+    background: linear-gradient(135deg, #16213e 0%, #0f3460 100%);
+    padding: 14px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+    flex-shrink: 0;
+  }
+  .kitchen-header .kh-left {
+    display: flex; align-items: center; gap: 14px;
+  }
+  .kitchen-header h1 {
+    font-family: 'Fredoka', sans-serif;
+    font-size: 22px; font-weight: 700; color: #e94560;
+  }
+  .kitchen-header .kh-stats {
+    display: flex; gap: 18px; align-items: center;
+  }
+  .kitchen-header .kh-stat {
+    font-family: 'Fredoka', sans-serif;
+    font-size: 14px; color: rgba(255,255,255,0.6);
+  }
+  .kitchen-header .kh-stat strong {
+    color: #fff; font-size: 18px; margin-right: 4px;
+  }
+  .kitchen-header .kh-right {
+    display: flex; align-items: center; gap: 12px;
+  }
+  .kh-clock {
+    font-family: 'Fredoka', sans-serif;
+    font-size: 18px; font-weight: 600; color: rgba(255,255,255,0.7);
+  }
+  .btn-exit-kitchen {
+    border: 2px solid rgba(255,255,255,0.2);
+    background: transparent; color: rgba(255,255,255,0.7);
+    font-family: 'Fredoka', sans-serif;
+    font-size: 13px; font-weight: 600;
+    padding: 8px 16px; border-radius: 8px;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .btn-exit-kitchen:hover { border-color: #e94560; color: #e94560; }
+  .btn-exit-kitchen:active { transform: scale(0.95); }
+
+  .kitchen-orders {
+    flex: 1; overflow-y: auto; padding: 20px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px; align-content: start;
+  }
+  .kitchen-orders::-webkit-scrollbar { width: 6px; }
+  .kitchen-orders::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+
+  .ko-card {
+    background: #16213e;
+    border-radius: 12px;
+    border: 2px solid #0f3460;
+    overflow: hidden;
+    transition: all 0.3s;
+    animation: ko-slide-in 0.3s ease;
+  }
+  @keyframes ko-slide-in {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .ko-card.ko-done {
+    opacity: 0.4; border-color: #2e7d32;
+  }
+  .ko-card-header {
+    padding: 14px 16px 10px;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .ko-card-header .ko-order-num {
+    font-family: 'Fredoka', sans-serif;
+    font-size: 20px; font-weight: 700; color: #e94560;
+  }
+  .ko-card-header .ko-table {
+    font-family: 'Fredoka', sans-serif;
+    font-size: 16px; font-weight: 700; color: #e94560;
+    background: rgba(233,69,96,0.15);
+    padding: 4px 12px; border-radius: 8px;
+  }
+  .ko-card-header .ko-time {
+    font-family: 'Fredoka', sans-serif;
+    font-size: 12px; color: rgba(255,255,255,0.4);
+    margin-top: 2px;
+  }
+  .ko-card-items {
+    padding: 12px 16px;
+  }
+  .ko-item {
+    font-family: 'Fredoka', sans-serif;
+    font-size: 17px; font-weight: 600; color: #fff;
+    padding: 6px 0;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .ko-item .ko-qty {
+    background: rgba(233,69,96,0.2); color: #e94560;
+    font-size: 14px; font-weight: 700;
+    min-width: 28px; height: 28px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ko-card.ko-done .ko-item .ko-qty {
+    background: rgba(46,125,50,0.2); color: #4caf50;
+  }
+  .ko-card-footer {
+    padding: 10px 16px 14px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    display: flex; gap: 8px;
+  }
+  .ko-btn-done {
+    flex: 1; border: none;
+    background: linear-gradient(135deg, #2e7d32, #1b5e20);
+    color: white; font-family: 'Fredoka', sans-serif;
+    font-size: 15px; font-weight: 700;
+    padding: 12px; border-radius: 8px;
+    cursor: pointer; transition: all 0.15s;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .ko-btn-done:active { transform: scale(0.96); }
+  .ko-btn-done.is-done {
+    background: rgba(46,125,50,0.2); color: #4caf50;
+    cursor: default;
+  }
+  .ko-btn-recall {
+    border: 2px solid rgba(255,255,255,0.15);
+    background: transparent; color: rgba(255,255,255,0.5);
+    font-family: 'Fredoka', sans-serif;
+    font-size: 13px; font-weight: 600;
+    padding: 12px 16px; border-radius: 8px;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .ko-btn-recall:active { transform: scale(0.96); }
+  .ko-elapsed {
+    font-family: 'Fredoka', sans-serif;
+    font-size: 12px; color: rgba(255,255,255,0.3);
+    padding: 0 16px 10px;
+  }
+  .ko-elapsed.ko-late { color: #e94560; font-weight: 600; }
+
+  .kitchen-empty {
+    grid-column: 1 / -1;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 80px 20px; text-align: center;
+  }
+  .kitchen-empty .emoji { font-size: 48px; margin-bottom: 12px; }
+  .kitchen-empty p {
+    font-family: 'Fredoka', sans-serif;
+    font-size: 18px; color: rgba(255,255,255,0.3);
+  }
 </style>
 </head>
 <body>
@@ -738,9 +918,38 @@
 <div class="table-screen" id="tableScreen">
   <div class="table-screen-logo">☕</div>
   <h1>Kopi <span>Corner</span></h1>
-  <div class="subtitle">Select table to start order</div>
-  <div class="table-grid" id="tableGrid"></div>
+  <div class="mode-toggle" id="modeToggle">
+    <button class="mode-toggle-btn active" data-mode="foh" id="modeFOH">🧾 Front of House</button>
+    <button class="mode-toggle-btn" data-mode="kitchen" id="modeKitchen">🍳 Kitchen Display</button>
+  </div>
+  <div id="tableGridWrapper">
+    <div class="subtitle">Select table to start order</div>
+    <div class="table-grid" id="tableGrid"></div>
+  </div>
   <div class="table-screen-footer">Kopi Corner POS</div>
+</div>
+
+<!-- Kitchen Display View -->
+<div class="kitchen-view" id="kitchenView">
+  <div class="kitchen-header">
+    <div class="kh-left">
+      <h1>🍳 Kitchen Display</h1>
+      <div class="kh-stats">
+        <div class="kh-stat"><strong id="khPending">0</strong> pending</div>
+        <div class="kh-stat"><strong id="khDone">0</strong> done</div>
+      </div>
+    </div>
+    <div class="kh-right">
+      <div class="kh-clock" id="khClock">12:00</div>
+      <button class="btn-exit-kitchen" id="btnExitKitchen">Exit Kitchen</button>
+    </div>
+  </div>
+  <div class="kitchen-orders" id="kitchenOrders">
+    <div class="kitchen-empty">
+      <span class="emoji">🍳</span>
+      <p>Waiting for orders...</p>
+    </div>
+  </div>
 </div>
 
 <div class="app">
@@ -1761,6 +1970,7 @@ function handleKitchen() {
   }
 
   playBeep(660, 0.12);
+  notifyKitchen();
 
   // Move to next order without showing receipt
   orderNumber++;
@@ -2015,7 +2225,171 @@ function selectTable(table) {
 
 function showTableScreen() {
   currentTable = null;
-  document.getElementById('tableScreen').classList.remove('hidden');
+  const screen = document.getElementById('tableScreen');
+  screen.classList.remove('hidden');
+  // Reset to FOH mode when re-showing
+  setTableScreenMode('foh');
+}
+
+function setTableScreenMode(mode) {
+  document.getElementById('modeFOH').classList.toggle('active', mode === 'foh');
+  document.getElementById('modeKitchen').classList.toggle('active', mode === 'kitchen');
+  document.getElementById('tableGridWrapper').style.display = mode === 'foh' ? '' : 'none';
+}
+
+
+// ═══════════════════════════════════════════════════════
+// KITCHEN DISPLAY
+// ═══════════════════════════════════════════════════════
+
+let kitchenQueue = []; // { id, orderNo, table, time, date, items[], timestamp, done }
+let kitchenTimerInterval = null;
+
+function enterKitchenMode() {
+  document.getElementById('tableScreen').classList.add('hidden');
+  document.getElementById('kitchenView').classList.add('active');
+  loadKitchenQueue();
+  renderKitchenOrders();
+  updateKitchenClock();
+  // Update elapsed timers every 15s
+  if (kitchenTimerInterval) clearInterval(kitchenTimerInterval);
+  kitchenTimerInterval = setInterval(() => {
+    renderKitchenOrders();
+    updateKitchenClock();
+  }, 15000);
+}
+
+function exitKitchenMode() {
+  document.getElementById('kitchenView').classList.remove('active');
+  if (kitchenTimerInterval) {
+    clearInterval(kitchenTimerInterval);
+    kitchenTimerInterval = null;
+  }
+  showTableScreen();
+}
+
+function updateKitchenClock() {
+  const el = document.getElementById('khClock');
+  if (el) el.textContent = new Date().toLocaleTimeString('en-MY', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+}
+
+function loadKitchenQueue() {
+  // Build kitchen queue from orderHistory — kitchen orders that were sent today
+  const today = new Date().toLocaleDateString('en-MY', { day:'2-digit', month:'short', year:'numeric' });
+  kitchenQueue = orderHistory
+    .filter(o => o.sentToKitchen)
+    .map(o => ({
+      id: o.orderNo,
+      orderNo: o.orderNo,
+      table: o.table || 'Dine In',
+      time: o.time,
+      date: o.date,
+      items: o.items,
+      timestamp: o.timestamp ? new Date(o.timestamp) : new Date(),
+      done: o.kitchenDone || false,
+    }));
+}
+
+function renderKitchenOrders() {
+  const container = document.getElementById('kitchenOrders');
+  const pendingCount = kitchenQueue.filter(o => !o.done).length;
+  const doneCount = kitchenQueue.filter(o => o.done).length;
+
+  document.getElementById('khPending').textContent = pendingCount;
+  document.getElementById('khDone').textContent = doneCount;
+
+  if (kitchenQueue.length === 0) {
+    container.innerHTML = `<div class="kitchen-empty"><span class="emoji">🍳</span><p>Waiting for orders...</p></div>`;
+    return;
+  }
+
+  // Show pending first, then done
+  const sorted = [...kitchenQueue].sort((a, b) => {
+    if (a.done !== b.done) return a.done ? 1 : -1;
+    return a.timestamp - b.timestamp;
+  });
+
+  let html = '';
+  sorted.forEach((order, idx) => {
+    const qIdx = kitchenQueue.indexOf(order);
+    const elapsed = getKitchenElapsed(order.timestamp);
+    const isLate = !order.done && (Date.now() - order.timestamp.getTime()) > 10 * 60 * 1000; // > 10min
+
+    html += `
+      <div class="ko-card${order.done ? ' ko-done' : ''}" data-qidx="${qIdx}">
+        <div class="ko-card-header">
+          <div>
+            <div class="ko-order-num">#${escapeHTML(order.orderNo)}</div>
+            <div class="ko-time">${escapeHTML(order.time)}</div>
+          </div>
+          <div class="ko-table">${escapeHTML(order.table)}</div>
+        </div>
+        <div class="ko-card-items">
+          ${order.items.map(i => `
+            <div class="ko-item">
+              <span class="ko-qty">${i.qty}</span>
+              <span>${escapeHTML(i.name)}</span>
+            </div>
+          `).join('')}
+        </div>
+        <div class="ko-elapsed${isLate ? ' ko-late' : ''}">${elapsed}</div>
+        <div class="ko-card-footer">
+          ${order.done
+            ? `<button class="ko-btn-done is-done">✅ Done</button>
+               <button class="ko-btn-recall" data-qidx="${qIdx}">↩ Recall</button>`
+            : `<button class="ko-btn-done" data-qidx="${qIdx}">✅ Mark Done</button>`
+          }
+        </div>
+      </div>`;
+  });
+
+  container.innerHTML = html;
+
+  // Bind events
+  container.querySelectorAll('.ko-btn-done:not(.is-done)').forEach(btn => {
+    btn.onclick = () => markKitchenDone(parseInt(btn.dataset.qidx));
+  });
+  container.querySelectorAll('.ko-btn-recall').forEach(btn => {
+    btn.onclick = () => recallKitchenOrder(parseInt(btn.dataset.qidx));
+  });
+}
+
+function markKitchenDone(qIdx) {
+  const order = kitchenQueue[qIdx];
+  if (!order) return;
+  order.done = true;
+  // Also mark in orderHistory
+  const hist = orderHistory.find(o => o.orderNo === order.orderNo && o.sentToKitchen);
+  if (hist) hist.kitchenDone = true;
+  playBeep(660, 0.08);
+  renderKitchenOrders();
+}
+
+function recallKitchenOrder(qIdx) {
+  const order = kitchenQueue[qIdx];
+  if (!order) return;
+  order.done = false;
+  const hist = orderHistory.find(o => o.orderNo === order.orderNo && o.sentToKitchen);
+  if (hist) hist.kitchenDone = false;
+  playBeep(440, 0.08);
+  renderKitchenOrders();
+}
+
+function getKitchenElapsed(timestamp) {
+  const secs = Math.floor((Date.now() - timestamp.getTime()) / 1000);
+  if (secs < 60) return 'just now';
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins} min ago`;
+  const hrs = Math.floor(mins / 60);
+  return `${hrs}h ${mins % 60}m ago`;
+}
+
+// Called from FOH when an order is sent to kitchen — refresh kitchen if open
+function notifyKitchen() {
+  if (document.getElementById('kitchenView').classList.contains('active')) {
+    loadKitchenQueue();
+    renderKitchenOrders();
+  }
 }
 
 
@@ -2111,6 +2485,13 @@ document.getElementById('btnPay').onclick = handlePay;
 document.getElementById('btnKitchen').onclick = handleKitchen;
 document.getElementById('btnClear').onclick = clearCart;
 document.getElementById('tableBadge').onclick = showTableScreen;
+document.getElementById('btnExitKitchen').onclick = exitKitchenMode;
+document.getElementById('modeFOH').onclick = () => setTableScreenMode('foh');
+document.getElementById('modeKitchen').onclick = () => {
+  setTableScreenMode('kitchen');
+  // Auto-enter kitchen after short delay for visual feedback
+  setTimeout(() => enterKitchenMode(), 200);
+};
 document.getElementById('btnPrint').onclick = handlePrint;
 document.getElementById('btnDone').onclick = showSuccess;
 document.getElementById('btnNewOrder').onclick = newOrder;
@@ -2149,7 +2530,9 @@ document.addEventListener('keydown', (e) => {
     const receiptModal = document.getElementById('receiptModal');
     const settingsPanel = document.getElementById('settingsPanel');
     const historyPanel = document.getElementById('historyPanel');
-    if (receiptModal.classList.contains('show')) receiptModal.classList.remove('show');
+    const kitchenView = document.getElementById('kitchenView');
+    if (kitchenView.classList.contains('active')) exitKitchenMode();
+    else if (receiptModal.classList.contains('show')) receiptModal.classList.remove('show');
     else if (settingsPanel.classList.contains('show')) settingsPanel.classList.remove('show');
     else if (historyPanel.classList.contains('show')) closeHistory();
   }
