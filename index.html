@@ -346,6 +346,18 @@
   }
   .btn-pay:active { transform: scale(0.96); }
   .btn-pay:disabled { opacity: 0.4; cursor: default; transform: none; }
+  .btn-kitchen {
+    flex: 1; border: none;
+    background: linear-gradient(135deg, var(--accent-orange) 0%, #e67e22 100%);
+    color: white; font-family: 'Fredoka', sans-serif;
+    font-weight: 600; font-size: 16px;
+    padding: 14px; border-radius: var(--radius-sm);
+    cursor: pointer;
+    box-shadow: var(--shadow-md); transition: all 0.15s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn-kitchen:active { transform: scale(0.96); }
+  .btn-kitchen:disabled { opacity: 0.4; cursor: default; transform: none; }
 
   /* ─── RECEIPT MODAL ─── */
   .modal-overlay {
@@ -686,7 +698,8 @@
       <div class="totals-row tax"><span>SST (8%)</span><span id="tax">RM 0.00</span></div>
       <div class="totals-row total"><span>Total</span><span id="total">RM 0.00</span></div>
       <div class="cart-actions">
-        <button class="btn-pay" id="btnPay" disabled aria-label="Charge order">💰 Charge</button>
+        <button class="btn-kitchen" id="btnKitchen" disabled aria-label="Send order to kitchen">🍳 Kitchen</button>
+        <button class="btn-pay" id="btnPay" disabled aria-label="Charge and view receipt">💰 Charge</button>
       </div>
     </div>
   </aside>
@@ -1123,6 +1136,64 @@ class ThermalPrinter {
     await this.sendBytes(buffer);
   }
 
+  // Kitchen chit: compact order slip without totals/payment info
+  async printKitchenChit(receiptData) {
+    const parts = [];
+    const push = (...a) => a.forEach(x => parts.push(x));
+    const W = CONFIG.RECEIPT_WIDTH;
+
+    push(this.cmd_init());
+
+    // Header
+    push(this.cmd_align(1));
+    push(this.cmd_textSize(1, 1));
+    push(this.cmd_bold(1));
+    push(this.encode('** KITCHEN **'));
+    push(this.cmd_lf());
+    push(this.cmd_textSize(0, 0));
+    push(this.cmd_bold(0));
+
+    // Order info
+    push(this.cmd_align(0));
+    push(this.encode('='.repeat(W)));
+    push(this.cmd_lf());
+    push(this.cmd_bold(1));
+    push(this.cmd_textSize(1, 0)); // double-width for order number
+    push(this.encode(`Order #${receiptData.orderNo}`));
+    push(this.cmd_lf());
+    push(this.cmd_textSize(0, 0));
+    push(this.cmd_bold(0));
+    push(this.encode(this.padRight(receiptData.date, receiptData.time, W)));
+    push(this.cmd_lf());
+    push(this.encode('='.repeat(W)));
+    push(this.cmd_lf());
+
+    // Items — big and clear for kitchen readability
+    push(this.cmd_bold(1));
+    for (const item of receiptData.items) {
+      push(this.cmd_textSize(1, 0)); // double-width
+      push(this.encode(`${item.qty}x ${item.name}`));
+      push(this.cmd_lf());
+    }
+    push(this.cmd_textSize(0, 0));
+    push(this.cmd_bold(0));
+
+    push(this.encode('='.repeat(W)));
+    push(this.cmd_lf());
+    push(this.cmd_align(1));
+    push(this.encode(`Items: ${receiptData.items.reduce((s, i) => s + i.qty, 0)}`));
+    push(this.cmd_lf());
+
+    push(this.cmd_feedLines(4));
+    push(this.cmd_partialCut());
+
+    const totalLen = parts.reduce((s, p) => s + p.length, 0);
+    const buffer = new Uint8Array(totalLen);
+    let offset = 0;
+    for (const part of parts) { buffer.set(part, offset); offset += part.length; }
+    await this.sendBytes(buffer);
+  }
+
   // Utility: pad a line so left and right text fill width
   padRight(left, right, width) {
     const gap = width - left.length - right.length;
@@ -1480,7 +1551,9 @@ function updateTotals() {
   document.getElementById('subtotal').textContent = `${CONFIG.CURRENCY} ${centsToRM(subCents)}`;
   document.getElementById('tax').textContent = `${CONFIG.CURRENCY} ${centsToRM(taxCents)}`;
   document.getElementById('total').textContent = `${CONFIG.CURRENCY} ${centsToRM(totCents)}`;
-  document.getElementById('btnPay').disabled = cart.length === 0;
+  const empty = cart.length === 0;
+  document.getElementById('btnPay').disabled = empty;
+  document.getElementById('btnKitchen').disabled = empty;
 }
 
 
@@ -1569,6 +1642,38 @@ function handlePay() {
     printBtn.innerHTML = '🖨️ Print';
   }
   document.getElementById('receiptModal').classList.add('show');
+}
+
+function handleKitchen() {
+  if (cart.length === 0) return;
+
+  const receiptData = getReceiptData();
+  const order = { ...receiptData, timestamp: new Date(), sentToKitchen: true };
+
+  // Save to history
+  orderHistory.unshift(order);
+  updateHistoryBadge();
+  orderDB.addOrder(order).catch(e => console.warn('DB save failed:', e));
+  orderDB.setMeta('lastOrderNumber', orderNumber).catch(e => console.warn('DB meta save failed:', e));
+
+  // Print kitchen chit to thermal printer if connected
+  if (printer.connected) {
+    printer.printKitchenChit(receiptData).then(() => {
+      showToast('🍳 Order #' + receiptData.orderNo + ' sent to kitchen & printed!', 'success');
+    }).catch(e => {
+      showToast('🍳 Sent to kitchen (print failed: ' + e.message + ')', 'error');
+    });
+  } else {
+    showToast('🍳 Order #' + receiptData.orderNo + ' sent to kitchen!', 'success');
+  }
+
+  playBeep(660, 0.12);
+
+  // Move to next order without showing receipt
+  orderNumber++;
+  document.getElementById('orderNum').textContent = `Order #${String(orderNumber).padStart(3, '0')}`;
+  cart = [];
+  renderCart();
 }
 
 async function handlePrint() {
@@ -1871,6 +1976,7 @@ function updateClock() {
 // ═══════════════════════════════════════════════════════
 
 document.getElementById('btnPay').onclick = handlePay;
+document.getElementById('btnKitchen').onclick = handleKitchen;
 document.getElementById('btnClear').onclick = clearCart;
 document.getElementById('btnPrint').onclick = handlePrint;
 document.getElementById('btnDone').onclick = showSuccess;
