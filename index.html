@@ -657,7 +657,7 @@
         📋 <span>Orders</span> <span class="badge" id="historyBadge">0</span>
       </button>
       <button class="btn-printer-status" id="btnPrinterStatus" title="Printer Settings">
-        <span class="dot"></span>
+        <span class="dot" aria-hidden="true"></span>
         <span id="printerLabel">No Printer</span>
       </button>
       <div class="clock" id="clock">12:00</div>
@@ -665,12 +665,12 @@
     </div>
   </header>
 
-  <main class="menu-area">
-    <div class="cat-tabs" id="catTabs"></div>
-    <div class="menu-grid" id="menuGrid"></div>
+  <main class="menu-area" role="main">
+    <nav class="cat-tabs" id="catTabs" role="tablist" aria-label="Menu categories"></nav>
+    <div class="menu-grid" id="menuGrid" role="list" aria-label="Menu items"></div>
   </main>
 
-  <aside class="cart-panel">
+  <aside class="cart-panel" role="complementary" aria-label="Shopping cart">
     <div class="cart-header">
       <h2>🧾 Order <span class="cart-count" id="cartCount">0</span></h2>
       <button class="btn-clear" id="btnClear">Clear All</button>
@@ -686,14 +686,14 @@
       <div class="totals-row tax"><span>SST (8%)</span><span id="tax">RM 0.00</span></div>
       <div class="totals-row total"><span>Total</span><span id="total">RM 0.00</span></div>
       <div class="cart-actions">
-        <button class="btn-pay" id="btnPay" disabled>💰 Charge</button>
+        <button class="btn-pay" id="btnPay" disabled aria-label="Charge order">💰 Charge</button>
       </div>
     </div>
   </aside>
 </div>
 
 <!-- Receipt Modal -->
-<div class="modal-overlay" id="receiptModal">
+<div class="modal-overlay" id="receiptModal" role="dialog" aria-label="Receipt" aria-modal="true">
   <div class="modal">
     <div class="modal-body" id="receiptBody"></div>
     <div class="modal-footer">
@@ -705,7 +705,7 @@
 </div>
 
 <!-- Printer Settings Modal -->
-<div class="settings-panel" id="settingsPanel">
+<div class="settings-panel" id="settingsPanel" role="dialog" aria-label="Printer settings" aria-modal="true">
   <div class="settings-box">
     <h2>🖨️ Printer Setup</h2>
     <p class="desc">Connect a Bluetooth thermal receipt printer (80mm). Most cheap Bluetooth printers from Shopee/Lazada will work.</p>
@@ -733,7 +733,7 @@
 </div>
 
 <!-- Success Flash -->
-<div class="success-overlay" id="successOverlay">
+<div class="success-overlay" id="successOverlay" role="alert" aria-live="assertive">
   <span class="big-check">✅</span>
   <h2>Payment Complete!</h2>
   <p id="successMsg">RM 0.00</p>
@@ -775,12 +775,33 @@
 </div>
 
 <!-- Toast -->
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
 // ═══════════════════════════════════════════════════════
 // ESC/POS BLUETOOTH THERMAL PRINTER ENGINE
 // ═══════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════
+// CONFIGURATION
+// ═══════════════════════════════════════════════════════
+
+const CONFIG = Object.freeze({
+  TAX_RATE: 0.08,           // 8% SST
+  TAX_LABEL: 'SST (8%)',
+  RECEIPT_WIDTH: 48,        // characters for thermal printer
+  RECEIPT_WIDTH_DOUBLE: 24, // characters when using double-size text
+  PRINTER_CHUNK_SIZE: 100,  // BLE MTU chunk size in bytes
+  PRINTER_CHUNK_DELAY: 20,  // ms delay between BLE chunks
+  SHOP_NAME: 'KOPI CORNER',
+  SHOP_ADDRESS_1: 'Lot 12, Jalan Kopitiam',
+  SHOP_ADDRESS_2: '10200 George Town, Penang',
+  SHOP_PHONE: 'Tel: 04-123 4567',
+  CURRENCY: 'RM',
+  CLOCK_INTERVAL: 10000,    // ms between clock updates
+  SUCCESS_DISPLAY_MS: 1800, // ms to show success overlay
+  TOAST_DURATION: 3000,     // ms to show toast notifications
+});
 
 const ESC = 0x1B;
 const GS  = 0x1D;
@@ -874,7 +895,9 @@ class ThermalPrinter {
           }
           if (found) break;
         }
-      } catch {}
+      } catch (e) {
+        console.warn('[Printer] Service enumeration failed:', e.message);
+      }
     }
 
     if (!found) {
@@ -905,7 +928,7 @@ class ThermalPrinter {
   // Send raw bytes in chunks (BLE has ~512 byte MTU but safer at 100-200)
   async sendBytes(data) {
     if (!this.connected || !this.characteristic) throw new Error('Printer not connected');
-    const CHUNK = 100;
+    const CHUNK = CONFIG.PRINTER_CHUNK_SIZE;
     for (let i = 0; i < data.length; i += CHUNK) {
       const chunk = data.slice(i, i + CHUNK);
       if (this.characteristic.properties.writeWithoutResponse) {
@@ -914,7 +937,7 @@ class ThermalPrinter {
         await this.characteristic.writeValue(chunk);
       }
       // Small delay between chunks for reliability
-      await new Promise(r => setTimeout(r, 20));
+      await new Promise(r => setTimeout(r, CONFIG.PRINTER_CHUNK_DELAY));
     }
   }
 
@@ -962,42 +985,43 @@ class ThermalPrinter {
     push(this.cmd_align(1)); // center
     push(this.cmd_textSize(1, 1)); // double size
     push(this.cmd_bold(1));
-    push(this.encode('KOPI CORNER'));
+    push(this.encode(CONFIG.SHOP_NAME));
     push(this.cmd_lf());
     push(this.cmd_textSize(0, 0)); // normal
     push(this.cmd_bold(0));
-    push(this.encode('Lot 12, Jalan Kopitiam'));
+    push(this.encode(CONFIG.SHOP_ADDRESS_1));
     push(this.cmd_lf());
-    push(this.encode('10200 George Town, Penang'));
+    push(this.encode(CONFIG.SHOP_ADDRESS_2));
     push(this.cmd_lf());
-    push(this.encode('Tel: 04-123 4567'));
+    push(this.encode(CONFIG.SHOP_PHONE));
     push(this.cmd_lf());
 
     // Dashed line
+    const W = CONFIG.RECEIPT_WIDTH;
     push(this.cmd_align(0)); // left
-    push(this.encode('------------------------------------------------'));
+    push(this.encode('-'.repeat(W)));
     push(this.cmd_lf());
 
     // Order info
     push(this.cmd_align(0));
-    push(this.encode(this.padRight(`Order: #${receiptData.orderNo}`, `${receiptData.time}`, 48)));
+    push(this.encode(this.padRight(`Order: #${receiptData.orderNo}`, `${receiptData.time}`, W)));
     push(this.cmd_lf());
-    push(this.encode(this.padRight(`Date: ${receiptData.date}`, 'Dine In', 48)));
+    push(this.encode(this.padRight(`Date: ${receiptData.date}`, 'Dine In', W)));
     push(this.cmd_lf());
 
     // Double line
-    push(this.encode('================================================'));
+    push(this.encode('='.repeat(W)));
     push(this.cmd_lf());
 
     // Items
     push(this.cmd_bold(1));
     for (const item of receiptData.items) {
-      const line = this.padRight(`${item.qty}x ${item.name}`, `RM ${item.total}`, 48);
+      const line = this.padRight(`${item.qty}x ${item.name}`, `${CONFIG.CURRENCY} ${item.total}`, W);
       push(this.encode(line));
       push(this.cmd_lf());
       if (item.qty > 1) {
         push(this.cmd_bold(0));
-        push(this.encode(`   @ RM ${item.unitPrice} each`));
+        push(this.encode(`   @ ${CONFIG.CURRENCY} ${item.unitPrice} each`));
         push(this.cmd_lf());
         push(this.cmd_bold(1));
       }
@@ -1005,33 +1029,33 @@ class ThermalPrinter {
     push(this.cmd_bold(0));
 
     // Double line
-    push(this.encode('================================================'));
+    push(this.encode('='.repeat(W)));
     push(this.cmd_lf());
 
     // Totals
-    push(this.encode(this.padRight('Subtotal', `RM ${receiptData.subtotal}`, 48)));
+    push(this.encode(this.padRight('Subtotal', `${CONFIG.CURRENCY} ${receiptData.subtotal}`, W)));
     push(this.cmd_lf());
-    push(this.encode(this.padRight('SST (8%)', `RM ${receiptData.tax}`, 48)));
+    push(this.encode(this.padRight(CONFIG.TAX_LABEL, `${CONFIG.CURRENCY} ${receiptData.tax}`, W)));
     push(this.cmd_lf());
 
-    push(this.encode('------------------------------------------------'));
+    push(this.encode('-'.repeat(W)));
     push(this.cmd_lf());
 
     // Grand total
     push(this.cmd_textSize(1, 1));
     push(this.cmd_bold(1));
-    push(this.encode(this.padRight('TOTAL', `RM ${receiptData.total}`, 24)));
+    push(this.encode(this.padRight('TOTAL', `${CONFIG.CURRENCY} ${receiptData.total}`, CONFIG.RECEIPT_WIDTH_DOUBLE)));
     push(this.cmd_lf());
     push(this.cmd_textSize(0, 0));
     push(this.cmd_bold(0));
 
-    push(this.encode('------------------------------------------------'));
+    push(this.encode('-'.repeat(W)));
     push(this.cmd_lf());
 
-    push(this.encode(this.padRight('Cash', `RM ${receiptData.total}`, 48)));
+    push(this.encode(this.padRight('Cash', `${CONFIG.CURRENCY} ${receiptData.total}`, W)));
     push(this.cmd_lf());
 
-    push(this.encode('------------------------------------------------'));
+    push(this.encode('-'.repeat(W)));
     push(this.cmd_lf());
 
     // Footer
@@ -1122,6 +1146,10 @@ class OrderDB {
   }
 
   async open() {
+    if (!window.indexedDB) {
+      console.warn('[DB] IndexedDB not supported in this browser');
+      return null;
+    }
     return new Promise((resolve, reject) => {
       const req = indexedDB.open(this.dbName, this.version);
       req.onupgradeneeded = (e) => {
@@ -1141,6 +1169,10 @@ class OrderDB {
   }
 
   async addOrder(order) {
+    if (!this.db) {
+      console.warn('[DB] Database not open, skipping order save');
+      return null;
+    }
     return new Promise((resolve, reject) => {
       const tx = this.db.transaction('orders', 'readwrite');
       const store = tx.objectStore('orders');
@@ -1148,11 +1180,19 @@ class OrderDB {
       const record = { ...order, timestamp: order.timestamp instanceof Date ? order.timestamp.toISOString() : order.timestamp };
       const req = store.add(record);
       req.onsuccess = () => resolve(req.result);
-      req.onerror = (e) => reject(e.target.error);
+      req.onerror = (e) => {
+        const error = e.target.error;
+        if (error && error.name === 'QuotaExceededError') {
+          console.error('[DB] Storage quota exceeded. Consider clearing old orders.');
+          showToast('Storage full — clear old orders to continue saving.', 'error');
+        }
+        reject(error);
+      };
     });
   }
 
   async getAllOrders() {
+    if (!this.db) return [];
     return new Promise((resolve, reject) => {
       const tx = this.db.transaction('orders', 'readonly');
       const store = tx.objectStore('orders');
@@ -1171,6 +1211,7 @@ class OrderDB {
   }
 
   async clearAllOrders() {
+    if (!this.db) return;
     return new Promise((resolve, reject) => {
       const tx = this.db.transaction('orders', 'readwrite');
       const store = tx.objectStore('orders');
@@ -1181,6 +1222,7 @@ class OrderDB {
   }
 
   async getMeta(key) {
+    if (!this.db) return null;
     return new Promise((resolve, reject) => {
       const tx = this.db.transaction('meta', 'readonly');
       const store = tx.objectStore('meta');
@@ -1191,6 +1233,7 @@ class OrderDB {
   }
 
   async setMeta(key, value) {
+    if (!this.db) return;
     return new Promise((resolve, reject) => {
       const tx = this.db.transaction('meta', 'readwrite');
       const store = tx.objectStore('meta');
@@ -1289,18 +1332,34 @@ let soundEnabled = true;
 let orderHistory = []; // stores completed orders
 
 // ─── Audio ───
-const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) {
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    } catch (e) {
+      console.warn('[Audio] AudioContext not available:', e.message);
+      return null;
+    }
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
 function playBeep(freq = 880, dur = 0.08) {
   if (!soundEnabled) return;
+  const ctx = getAudioCtx();
+  if (!ctx) return;
   try {
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
     osc.type = 'sine'; osc.frequency.value = freq;
-    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
-    osc.connect(gain).connect(audioCtx.destination);
-    osc.start(); osc.stop(audioCtx.currentTime + dur);
-  } catch(e) {}
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(); osc.stop(ctx.currentTime + dur);
+  } catch (e) {
+    console.warn('[Audio] Beep failed:', e.message);
+  }
 }
 function playCashRegister() {
   if (!soundEnabled) return;
@@ -1321,6 +1380,8 @@ function renderCategories() {
     const btn = document.createElement('button');
     btn.className = `cat-tab${cat === currentCategory ? ' active' : ''}`;
     btn.textContent = cat;
+    btn.setAttribute('role', 'tab');
+    btn.setAttribute('aria-selected', cat === currentCategory ? 'true' : 'false');
     btn.onclick = () => {
       currentCategory = cat;
       renderCategories();
@@ -1337,13 +1398,17 @@ function renderMenu() {
   MENU[currentCategory].forEach((item, idx) => {
     const div = document.createElement('div');
     div.className = 'menu-item';
+    div.setAttribute('role', 'listitem');
+    div.setAttribute('tabindex', '0');
+    div.setAttribute('aria-label', `${item.name}, ${CONFIG.CURRENCY} ${item.price.toFixed(2)}`);
     div.innerHTML = `
-      <span class="emoji">${item.emoji}</span>
-      <span class="name">${item.name}</span>
-      <span class="price">RM ${item.price.toFixed(2)}</span>
-      ${item.tag ? `<span class="tag">${item.tag}</span>` : ''}
+      <span class="emoji" aria-hidden="true">${item.emoji}</span>
+      <span class="name">${escapeHTML(item.name)}</span>
+      <span class="price">${CONFIG.CURRENCY} ${item.price.toFixed(2)}</span>
+      ${item.tag ? `<span class="tag">${escapeHTML(item.tag)}</span>` : ''}
     `;
     div.onclick = () => addToCart(item, div);
+    div.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); addToCart(item, div); } };
     grid.appendChild(div);
   });
 }
@@ -1362,7 +1427,7 @@ function addToCart(item, el) {
 function updateQty(name, delta) {
   const item = cart.find(c => c.name === name);
   if (!item) return;
-  item.qty += delta;
+  item.qty = Math.max(0, Math.min(99, item.qty + delta));
   if (item.qty <= 0) cart = cart.filter(c => c.name !== name);
   playBeep(delta > 0 ? 780 : 440, 0.05);
   renderCart();
@@ -1387,12 +1452,12 @@ function renderCart() {
         <span class="ci-emoji">${item.emoji}</span>
         <div class="ci-info">
           <div class="ci-name">${item.name}</div>
-          <div class="ci-price">RM ${item.price.toFixed(2)} each</div>
+          <div class="ci-price">${CONFIG.CURRENCY} ${item.price.toFixed(2)} each</div>
         </div>
         <div class="ci-qty">
-          <button class="qty-btn" data-name="${item.name}" data-d="-1">−</button>
-          <span class="qty-num">${item.qty}</span>
-          <button class="qty-btn" data-name="${item.name}" data-d="1">+</button>
+          <button class="qty-btn" data-name="${item.name}" data-d="-1" aria-label="Decrease ${escapeHTML(item.name)} quantity">−</button>
+          <span class="qty-num" aria-label="Quantity: ${item.qty}">${item.qty}</span>
+          <button class="qty-btn" data-name="${item.name}" data-d="1" aria-label="Increase ${escapeHTML(item.name)} quantity">+</button>
         </div>`;
       container.appendChild(div);
     });
@@ -1403,15 +1468,18 @@ function renderCart() {
   updateTotals();
 }
 
-function getSubtotal() { return cart.reduce((s, c) => s + c.price * c.qty, 0); }
+// Use integer cents to avoid floating-point rounding errors
+function getSubtotalCents() { return cart.reduce((s, c) => s + Math.round(c.price * 100) * c.qty, 0); }
+function centsToRM(cents) { return (cents / 100).toFixed(2); }
+function getSubtotal() { return getSubtotalCents() / 100; }
 
 function updateTotals() {
-  const sub = getSubtotal();
-  const taxAmt = sub * 0.08;
-  const tot = sub + taxAmt;
-  document.getElementById('subtotal').textContent = `RM ${sub.toFixed(2)}`;
-  document.getElementById('tax').textContent = `RM ${taxAmt.toFixed(2)}`;
-  document.getElementById('total').textContent = `RM ${tot.toFixed(2)}`;
+  const subCents = getSubtotalCents();
+  const taxCents = Math.round(subCents * CONFIG.TAX_RATE);
+  const totCents = subCents + taxCents;
+  document.getElementById('subtotal').textContent = `${CONFIG.CURRENCY} ${centsToRM(subCents)}`;
+  document.getElementById('tax').textContent = `${CONFIG.CURRENCY} ${centsToRM(taxCents)}`;
+  document.getElementById('total').textContent = `${CONFIG.CURRENCY} ${centsToRM(totCents)}`;
   document.getElementById('btnPay').disabled = cart.length === 0;
 }
 
@@ -1424,47 +1492,54 @@ function getReceiptData() {
   const now = new Date();
   const date = now.toLocaleDateString('en-MY', { day:'2-digit', month:'short', year:'numeric' });
   const time = now.toLocaleTimeString('en-MY', { hour:'2-digit', minute:'2-digit' });
-  const sub = getSubtotal();
-  const tax = sub * 0.08;
-  const total = sub + tax;
+  const subCents = getSubtotalCents();
+  const taxCents = Math.round(subCents * CONFIG.TAX_RATE);
+  const totalCents = subCents + taxCents;
   return {
     orderNo: String(orderNumber).padStart(3, '0'),
     date, time,
     items: cart.map(c => ({
       name: c.name, qty: c.qty,
       unitPrice: c.price.toFixed(2),
-      total: (c.price * c.qty).toFixed(2),
+      total: centsToRM(Math.round(c.price * 100) * c.qty),
     })),
-    subtotal: sub.toFixed(2),
-    tax: tax.toFixed(2),
-    total: total.toFixed(2),
+    subtotal: centsToRM(subCents),
+    tax: centsToRM(taxCents),
+    total: centsToRM(totalCents),
   };
+}
+
+function escapeHTML(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
 }
 
 function generateReceiptHTML(data) {
   let items = '';
   data.items.forEach(c => {
-    items += `<div class="r-item"><span>${c.qty}x ${c.name}</span><span>RM ${c.total}</span></div>`;
-    if (c.qty > 1) items += `<div class="r-item-qty">  @ RM ${c.unitPrice} each</div>`;
+    const name = escapeHTML(c.name);
+    items += `<div class="r-item"><span>${c.qty}x ${name}</span><span>${CONFIG.CURRENCY} ${c.total}</span></div>`;
+    if (c.qty > 1) items += `<div class="r-item-qty">  @ ${CONFIG.CURRENCY} ${c.unitPrice} each</div>`;
   });
   return `
     <div class="receipt">
-      <div class="r-center r-bold r-big">☕ KOPI CORNER ☕</div>
-      <div class="r-center">Lot 12, Jalan Kopitiam</div>
-      <div class="r-center">10200 George Town, Penang</div>
-      <div class="r-center">Tel: 04-123 4567</div>
+      <div class="r-center r-bold r-big">☕ ${escapeHTML(CONFIG.SHOP_NAME)} ☕</div>
+      <div class="r-center">${escapeHTML(CONFIG.SHOP_ADDRESS_1)}</div>
+      <div class="r-center">${escapeHTML(CONFIG.SHOP_ADDRESS_2)}</div>
+      <div class="r-center">${escapeHTML(CONFIG.SHOP_PHONE)}</div>
       <div class="r-line"></div>
-      <div class="r-row"><span>Order: #${data.orderNo}</span><span>${data.time}</span></div>
-      <div class="r-row"><span>Date: ${data.date}</span><span>Dine In</span></div>
+      <div class="r-row"><span>Order: #${escapeHTML(data.orderNo)}</span><span>${escapeHTML(data.time)}</span></div>
+      <div class="r-row"><span>Date: ${escapeHTML(data.date)}</span><span>Dine In</span></div>
       <div class="r-double"></div>
       ${items}
       <div class="r-double"></div>
-      <div class="r-row"><span>Subtotal</span><span>RM ${data.subtotal}</span></div>
-      <div class="r-row"><span>SST (8%)</span><span>RM ${data.tax}</span></div>
+      <div class="r-row"><span>Subtotal</span><span>${CONFIG.CURRENCY} ${data.subtotal}</span></div>
+      <div class="r-row"><span>${CONFIG.TAX_LABEL}</span><span>${CONFIG.CURRENCY} ${data.tax}</span></div>
       <div class="r-line"></div>
-      <div class="r-row r-total"><span>TOTAL</span><span>RM ${data.total}</span></div>
+      <div class="r-row r-total"><span>TOTAL</span><span>${CONFIG.CURRENCY} ${data.total}</span></div>
       <div class="r-line"></div>
-      <div class="r-row"><span>Cash</span><span>RM ${data.total}</span></div>
+      <div class="r-row"><span>Cash</span><span>${CONFIG.CURRENCY} ${data.total}</span></div>
       <div class="r-line"></div>
       <div class="r-center" style="margin-top:8px;">* * * * * * *</div>
       <div class="r-center r-bold">Terima Kasih!</div>
@@ -1542,12 +1617,13 @@ function showSuccess() {
     orderDB.setMeta('lastOrderNumber', orderNumber).catch(e => console.warn('DB meta save failed:', e));
   }
 
-  const total = getSubtotal() * 1.08;
-  document.getElementById('successMsg').textContent = `RM ${total.toFixed(2)}`;
+  const subCents = getSubtotalCents();
+  const totalCents = subCents + Math.round(subCents * CONFIG.TAX_RATE);
+  document.getElementById('successMsg').textContent = `${CONFIG.CURRENCY} ${centsToRM(totalCents)}`;
   const overlay = document.getElementById('successOverlay');
   overlay.classList.add('show');
   playCashRegister();
-  setTimeout(() => { overlay.classList.remove('show'); newOrder(); }, 1800);
+  setTimeout(() => { overlay.classList.remove('show'); newOrder(); }, CONFIG.SUCCESS_DISPLAY_MS);
 }
 
 function newOrder() {
@@ -1588,7 +1664,7 @@ function renderHistory() {
   let html = '';
   orderHistory.forEach((order, idx) => {
     const itemSummary = order.items.map(i =>
-      `<div class="oc-item-line"><span>${i.qty}x ${i.name}</span><span>RM ${i.total}</span></div>`
+      `<div class="oc-item-line"><span>${i.qty}x ${escapeHTML(i.name)}</span><span>${CONFIG.CURRENCY} ${i.total}</span></div>`
     ).join('');
 
     const ts = order.timestamp ? new Date(order.timestamp) : null;
@@ -1598,7 +1674,7 @@ function renderHistory() {
       <div class="order-card" data-idx="${idx}">
         <div class="oc-top">
           <span class="oc-order-num">Order #${order.orderNo}</span>
-          <span class="oc-total">RM ${order.total}</span>
+          <span class="oc-total">${CONFIG.CURRENCY} ${order.total}</span>
         </div>
         <div class="oc-time">${order.date} · ${order.time} · ${timeAgo}</div>
         <div class="oc-items">${itemSummary}</div>
@@ -1637,7 +1713,7 @@ function updateHistorySummary() {
 
   document.getElementById('sumOrders').textContent = totalOrders;
   document.getElementById('sumItems').textContent = totalItems;
-  document.getElementById('sumRevenue').textContent = `RM ${totalRevenue.toFixed(0)}`;
+  document.getElementById('sumRevenue').textContent = `${CONFIG.CURRENCY} ${totalRevenue.toFixed(0)}`;
   document.getElementById('sumTopSeller').textContent = topSeller ? `${topSeller[0]} (${topSeller[1]})` : '—';
 }
 
@@ -1777,7 +1853,7 @@ function showToast(msg, type = 'normal') {
   toast.textContent = msg;
   toast.className = `toast show ${type}`;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toast.classList.remove('show'), 3000);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), CONFIG.TOAST_DURATION);
 }
 
 
@@ -1828,6 +1904,18 @@ document.getElementById('receiptModal').onclick = (e) => {
   }
 };
 
+// Keyboard: Escape closes any open modal/panel
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const receiptModal = document.getElementById('receiptModal');
+    const settingsPanel = document.getElementById('settingsPanel');
+    const historyPanel = document.getElementById('historyPanel');
+    if (receiptModal.classList.contains('show')) receiptModal.classList.remove('show');
+    else if (settingsPanel.classList.contains('show')) settingsPanel.classList.remove('show');
+    else if (historyPanel.classList.contains('show')) closeHistory();
+  }
+});
+
 // ─── Boot: load orders from IndexedDB, then render ───
 (async function boot() {
   try {
@@ -1855,7 +1943,7 @@ document.getElementById('receiptModal').onclick = (e) => {
   renderMenu();
   renderCart();
   updateClock();
-  setInterval(updateClock, 10000);
+  setInterval(updateClock, CONFIG.CLOCK_INTERVAL);
   updatePrinterUI();
   updateHistoryBadge();
 })();
