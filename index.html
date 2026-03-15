@@ -653,9 +653,95 @@
     display: flex; align-items: center; justify-content: center;
     padding: 0 5px;
   }
+
+  /* ─── TABLE SELECTION SCREEN ─── */
+  .table-screen {
+    position: fixed; inset: 0; z-index: 9999;
+    background: linear-gradient(135deg, var(--coffee-dark) 0%, var(--coffee-med) 50%, #4E342E 100%);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    transition: opacity 0.35s ease, transform 0.35s ease;
+  }
+  .table-screen.hidden {
+    opacity: 0; pointer-events: none; transform: scale(1.05);
+  }
+  .table-screen-logo {
+    font-size: 54px; margin-bottom: 4px;
+  }
+  .table-screen h1 {
+    font-family: 'Fredoka', sans-serif;
+    color: var(--cream);
+    font-size: 32px; font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .table-screen h1 span { color: var(--accent-orange); }
+  .table-screen .subtitle {
+    color: var(--coffee-light); font-size: 15px; font-weight: 500;
+    margin-bottom: 32px;
+    font-family: 'Fredoka', sans-serif;
+  }
+  .table-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 14px;
+    padding: 0 24px;
+    max-width: 520px;
+    width: 100%;
+  }
+  .table-btn {
+    aspect-ratio: 1;
+    border: 2px solid rgba(255,255,255,0.15);
+    border-radius: var(--radius);
+    background: rgba(255,255,255,0.08);
+    color: var(--cream);
+    font-family: 'Fredoka', sans-serif;
+    font-size: 22px; font-weight: 700;
+    cursor: pointer;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 2px;
+    transition: all 0.15s;
+  }
+  .table-btn .table-label {
+    font-size: 11px; font-weight: 500; opacity: 0.6;
+  }
+  .table-btn:hover { background: rgba(255,255,255,0.15); border-color: var(--accent-orange); }
+  .table-btn:active { transform: scale(0.93); background: var(--accent-orange); border-color: var(--accent-orange); }
+  .table-btn-takeaway {
+    grid-column: span 2;
+    aspect-ratio: auto;
+    padding: 14px;
+    font-size: 18px;
+    flex-direction: row; gap: 8px;
+  }
+  .table-btn-takeaway .table-label { font-size: 12px; }
+  .table-screen-footer {
+    margin-top: 28px;
+    color: rgba(255,248,225,0.35);
+    font-size: 12px;
+    font-family: 'Fredoka', sans-serif;
+  }
+
+  /* Table badge in header */
+  .table-badge {
+    background: var(--accent-orange); color: white;
+    font-family: 'Fredoka', sans-serif;
+    font-size: 13px; font-weight: 600;
+    padding: 4px 12px; border-radius: 20px;
+    cursor: pointer; transition: all 0.15s;
+    border: none;
+  }
+  .table-badge:active { transform: scale(0.95); }
 </style>
 </head>
 <body>
+
+<!-- Table Selection Screen -->
+<div class="table-screen" id="tableScreen">
+  <div class="table-screen-logo">☕</div>
+  <h1>Kopi <span>Corner</span></h1>
+  <div class="subtitle">Select table to start order</div>
+  <div class="table-grid" id="tableGrid"></div>
+  <div class="table-screen-footer">Kopi Corner POS</div>
+</div>
 
 <div class="app">
   <header class="header">
@@ -664,6 +750,7 @@
       <h1>Kopi <span>Corner</span></h1>
     </div>
     <div class="header-right">
+      <button class="table-badge" id="tableBadge" title="Change table">Table 1</button>
       <span class="order-num" id="orderNum">Order #001</span>
       <button class="btn-history" id="btnHistory" title="Order History">
         📋 <span>Orders</span> <span class="badge" id="historyBadge">0</span>
@@ -814,6 +901,7 @@ const CONFIG = Object.freeze({
   CLOCK_INTERVAL: 10000,    // ms between clock updates
   SUCCESS_DISPLAY_MS: 1800, // ms to show success overlay
   TOAST_DURATION: 3000,     // ms to show toast notifications
+  TABLE_COUNT: 15,          // number of dine-in tables
 });
 
 const ESC = 0x1B;
@@ -1019,7 +1107,7 @@ class ThermalPrinter {
     push(this.cmd_align(0));
     push(this.encode(this.padRight(`Order: #${receiptData.orderNo}`, `${receiptData.time}`, W)));
     push(this.cmd_lf());
-    push(this.encode(this.padRight(`Date: ${receiptData.date}`, 'Dine In', W)));
+    push(this.encode(this.padRight(`Date: ${receiptData.date}`, receiptData.table || 'Dine In', W)));
     push(this.cmd_lf());
 
     // Double line
@@ -1158,6 +1246,9 @@ class ThermalPrinter {
     push(this.encode('='.repeat(W)));
     push(this.cmd_lf());
     push(this.cmd_bold(1));
+    push(this.cmd_textSize(1, 1)); // double-size for table
+    push(this.encode(receiptData.table || 'Dine In'));
+    push(this.cmd_lf());
     push(this.cmd_textSize(1, 0)); // double-width for order number
     push(this.encode(`Order #${receiptData.orderNo}`));
     push(this.cmd_lf());
@@ -1401,6 +1492,7 @@ let orderNumber = 1;
 let currentCategory = Object.keys(MENU)[0];
 let soundEnabled = true;
 let orderHistory = []; // stores completed orders
+let currentTable = null; // null = not selected yet, 'Takeaway' or 'Table 1', 'Table 2', etc.
 
 // ─── Audio ───
 let audioCtx = null;
@@ -1571,6 +1663,7 @@ function getReceiptData() {
   return {
     orderNo: String(orderNumber).padStart(3, '0'),
     date, time,
+    table: currentTable || 'Dine In',
     items: cart.map(c => ({
       name: c.name, qty: c.qty,
       unitPrice: c.price.toFixed(2),
@@ -1603,7 +1696,7 @@ function generateReceiptHTML(data) {
       <div class="r-center">${escapeHTML(CONFIG.SHOP_PHONE)}</div>
       <div class="r-line"></div>
       <div class="r-row"><span>Order: #${escapeHTML(data.orderNo)}</span><span>${escapeHTML(data.time)}</span></div>
-      <div class="r-row"><span>Date: ${escapeHTML(data.date)}</span><span>Dine In</span></div>
+      <div class="r-row"><span>Date: ${escapeHTML(data.date)}</span><span>${escapeHTML(data.table || 'Dine In')}</span></div>
       <div class="r-double"></div>
       ${items}
       <div class="r-double"></div>
@@ -1674,6 +1767,7 @@ function handleKitchen() {
   document.getElementById('orderNum').textContent = `Order #${String(orderNumber).padStart(3, '0')}`;
   cart = [];
   renderCart();
+  showTableScreen();
 }
 
 async function handlePrint() {
@@ -1737,6 +1831,7 @@ function newOrder() {
   cart = [];
   renderCart();
   document.getElementById('receiptModal').classList.remove('show');
+  showTableScreen();
 }
 
 
@@ -1781,7 +1876,7 @@ function renderHistory() {
           <span class="oc-order-num">Order #${order.orderNo}</span>
           <span class="oc-total">${CONFIG.CURRENCY} ${order.total}</span>
         </div>
-        <div class="oc-time">${order.date} · ${order.time} · ${timeAgo}</div>
+        <div class="oc-time">${order.table ? escapeHTML(order.table) + ' · ' : ''}${order.date} · ${order.time} · ${timeAgo}</div>
         <div class="oc-items">${itemSummary}</div>
         <div class="oc-actions">
           <button class="oc-btn oc-btn-view" data-idx="${idx}">👁️ View</button>
@@ -1888,6 +1983,43 @@ function getTimeAgo(date) {
 
 
 // ═══════════════════════════════════════════════════════
+// TABLE SELECTION
+// ═══════════════════════════════════════════════════════
+
+function renderTableGrid() {
+  const grid = document.getElementById('tableGrid');
+  let html = '';
+  for (let i = 1; i <= CONFIG.TABLE_COUNT; i++) {
+    html += `<button class="table-btn" data-table="Table ${i}" aria-label="Table ${i}">
+      <span>${i}</span>
+      <span class="table-label">Table</span>
+    </button>`;
+  }
+  html += `<button class="table-btn table-btn-takeaway" data-table="Takeaway" aria-label="Takeaway order">
+    <span>📦</span>
+    <span>Takeaway</span>
+  </button>`;
+  grid.innerHTML = html;
+
+  grid.querySelectorAll('.table-btn').forEach(btn => {
+    btn.onclick = () => selectTable(btn.dataset.table);
+  });
+}
+
+function selectTable(table) {
+  currentTable = table;
+  playBeep(880, 0.1);
+  document.getElementById('tableBadge').textContent = table;
+  document.getElementById('tableScreen').classList.add('hidden');
+}
+
+function showTableScreen() {
+  currentTable = null;
+  document.getElementById('tableScreen').classList.remove('hidden');
+}
+
+
+// ═══════════════════════════════════════════════════════
 // PRINTER UI
 // ═══════════════════════════════════════════════════════
 
@@ -1978,6 +2110,7 @@ function updateClock() {
 document.getElementById('btnPay').onclick = handlePay;
 document.getElementById('btnKitchen').onclick = handleKitchen;
 document.getElementById('btnClear').onclick = clearCart;
+document.getElementById('tableBadge').onclick = showTableScreen;
 document.getElementById('btnPrint').onclick = handlePrint;
 document.getElementById('btnDone').onclick = showSuccess;
 document.getElementById('btnNewOrder').onclick = newOrder;
@@ -2045,6 +2178,7 @@ document.addEventListener('keydown', (e) => {
     console.warn('[KopiCorner] IndexedDB not available, using in-memory only:', e);
   }
 
+  renderTableGrid();
   renderCategories();
   renderMenu();
   renderCart();
