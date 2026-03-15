@@ -329,6 +329,7 @@
   }
   .totals-row.subtotal { font-size: 14px; color: var(--coffee-light); }
   .totals-row.tax { font-size: 13px; color: var(--coffee-light); }
+  .totals-row.rounding { font-size: 12px; color: var(--coffee-light); font-style: italic; }
   .totals-row.total {
     font-size: 22px; font-weight: 700; color: var(--coffee-dark);
     margin-top: 4px; padding-top: 6px;
@@ -992,6 +993,7 @@
     <div class="cart-footer">
       <div class="totals-row subtotal"><span>Subtotal</span><span id="subtotal">RM 0.00</span></div>
       <div class="totals-row tax"><span>SST (8%)</span><span id="tax">RM 0.00</span></div>
+      <div class="totals-row rounding" style="display:none;"><span>Rounding</span><span id="rounding">RM 0.00</span></div>
       <div class="totals-row total"><span>Total</span><span id="total">RM 0.00</span></div>
       <div class="cart-actions">
         <button class="btn-kitchen" id="btnKitchen" disabled aria-label="Send order to kitchen">🍳 Kitchen</button>
@@ -1347,6 +1349,11 @@ class ThermalPrinter {
     push(this.cmd_lf());
     push(this.encode(this.padRight(CONFIG.TAX_LABEL, `${CONFIG.CURRENCY} ${receiptData.tax}`, W)));
     push(this.cmd_lf());
+    if (receiptData.rounding) {
+      const sign = parseFloat(receiptData.rounding) > 0 ? '+' : '';
+      push(this.encode(this.padRight('Rounding', `${sign}${CONFIG.CURRENCY} ${receiptData.rounding}`, W)));
+      push(this.cmd_lf());
+    }
 
     push(this.encode('-'.repeat(W)));
     push(this.cmd_lf());
@@ -1845,13 +1852,34 @@ function getSubtotalCents() { return cart.reduce((s, c) => s + Math.round(c.pric
 function centsToRM(cents) { return (cents / 100).toFixed(2); }
 function getSubtotal() { return getSubtotalCents() / 100; }
 
-function updateTotals() {
+// Malaysian 5-sen rounding: round to nearest 5 cents
+function roundTo5Sen(cents) { return Math.round(cents / 5) * 5; }
+
+function getOrderTotals() {
   const subCents = getSubtotalCents();
   const taxCents = Math.round(subCents * CONFIG.TAX_RATE);
-  const totCents = subCents + taxCents;
+  const exactCents = subCents + taxCents;
+  const roundedCents = roundTo5Sen(exactCents);
+  const roundingCents = roundedCents - exactCents; // can be -2, -1, 0, +1, +2
+  return { subCents, taxCents, exactCents, roundedCents, roundingCents };
+}
+
+function updateTotals() {
+  const { subCents, taxCents, roundedCents, roundingCents } = getOrderTotals();
   document.getElementById('subtotal').textContent = `${CONFIG.CURRENCY} ${centsToRM(subCents)}`;
   document.getElementById('tax').textContent = `${CONFIG.CURRENCY} ${centsToRM(taxCents)}`;
-  document.getElementById('total').textContent = `${CONFIG.CURRENCY} ${centsToRM(totCents)}`;
+  document.getElementById('total').textContent = `${CONFIG.CURRENCY} ${centsToRM(roundedCents)}`;
+
+  // Show rounding adjustment row only when non-zero
+  const roundingEl = document.getElementById('rounding');
+  if (roundingCents !== 0) {
+    const sign = roundingCents > 0 ? '+' : '';
+    roundingEl.textContent = `${sign}${CONFIG.CURRENCY} ${centsToRM(roundingCents)}`;
+    roundingEl.parentElement.style.display = '';
+  } else {
+    roundingEl.parentElement.style.display = 'none';
+  }
+
   const empty = cart.length === 0;
   document.getElementById('btnPay').disabled = empty;
   document.getElementById('btnKitchen').disabled = empty;
@@ -1866,9 +1894,7 @@ function getReceiptData() {
   const now = new Date();
   const date = now.toLocaleDateString('en-MY', { day:'2-digit', month:'short', year:'numeric' });
   const time = now.toLocaleTimeString('en-MY', { hour:'2-digit', minute:'2-digit' });
-  const subCents = getSubtotalCents();
-  const taxCents = Math.round(subCents * CONFIG.TAX_RATE);
-  const totalCents = subCents + taxCents;
+  const { subCents, taxCents, roundedCents, roundingCents } = getOrderTotals();
   return {
     orderNo: String(orderNumber).padStart(3, '0'),
     date, time,
@@ -1880,7 +1906,8 @@ function getReceiptData() {
     })),
     subtotal: centsToRM(subCents),
     tax: centsToRM(taxCents),
-    total: centsToRM(totalCents),
+    rounding: roundingCents !== 0 ? centsToRM(roundingCents) : null,
+    total: centsToRM(roundedCents),
   };
 }
 
@@ -1911,6 +1938,7 @@ function generateReceiptHTML(data) {
       <div class="r-double"></div>
       <div class="r-row"><span>Subtotal</span><span>${CONFIG.CURRENCY} ${data.subtotal}</span></div>
       <div class="r-row"><span>${CONFIG.TAX_LABEL}</span><span>${CONFIG.CURRENCY} ${data.tax}</span></div>
+      ${data.rounding ? `<div class="r-row" style="font-size:12px;color:#888;"><span>Rounding</span><span>${parseFloat(data.rounding) > 0 ? '+' : ''}${CONFIG.CURRENCY} ${data.rounding}</span></div>` : ''}
       <div class="r-line"></div>
       <div class="r-row r-total"><span>TOTAL</span><span>${CONFIG.CURRENCY} ${data.total}</span></div>
       <div class="r-line"></div>
@@ -2026,9 +2054,8 @@ function showSuccess() {
     orderDB.setMeta('lastOrderNumber', orderNumber).catch(e => console.warn('DB meta save failed:', e));
   }
 
-  const subCents = getSubtotalCents();
-  const totalCents = subCents + Math.round(subCents * CONFIG.TAX_RATE);
-  document.getElementById('successMsg').textContent = `${CONFIG.CURRENCY} ${centsToRM(totalCents)}`;
+  const { roundedCents } = getOrderTotals();
+  document.getElementById('successMsg').textContent = `${CONFIG.CURRENCY} ${centsToRM(roundedCents)}`;
   const overlay = document.getElementById('successOverlay');
   overlay.classList.add('show');
   playCashRegister();
